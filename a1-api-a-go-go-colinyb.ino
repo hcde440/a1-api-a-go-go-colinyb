@@ -16,13 +16,15 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h> //provides the ability to parse and construct JSON objects
-
-const char* ssid = "CYB";
-const char* pass = "m1ck3yM0us3";
+//
+//const char* ssid = "CYB";
+//const char* pass = "m1ck3yM0us3";
+const char* ssid = "University of Washington";
+const char* pass = "";
 //const char* ipKey = "KNCAW2V3YI";
 //const char* newsKey = "01746050a5824dc7b223e27bf923d28a";
-const String aiqKey = "698F1252-DB57-457A-AADF-B4173C6485A1";
-const String locKey = "b4e3e1ef91da097fa72afb9db94629f2";
+const char* aiqKey = "698F1252-DB57-457A-AADF-B4173C6485A1";
+const char* locKey = "b4e3e1ef91da097fa72afb9db94629f2";
 
 //FOR FIRST ATTEMPT
 //typedef struct { //here we are creating our own geolocation data type to hold our geolocation data
@@ -51,6 +53,7 @@ LatLon location;
 
 typedef struct {
   String aqi;
+  String quality;
 } AirQual;
 
 AirQual airQuality;
@@ -77,9 +80,13 @@ void setup() {
   Serial.print("Your ESP has been assigned the internal IP address ");
   Serial.println(WiFi.localIP());
 
+  getLoc();
+  getAir();
+
   Serial.println();
-  Serial.print("You are in " + location.city + ".");
-  Serial.println("The air quality index is" + airQuality.aqi + ".");
+  Serial.print("You are in " + location.city + ". ");
+  Serial.print("The air quality index here is " + airQuality.aqi + ". ");
+  Serial.println("This is considered " + airQuality.quality + ".");
 
 //  //THIS WAS MY PRINTING/CALLING OF METHODS FROM THE APIS I CAN'T USE
 //
@@ -140,7 +147,6 @@ void getLoc() {
       String jsonData = theClient.getString();
       Serial.println("Parsing...");
       JsonObject& root = jsonBuffer.parse(jsonData);
-      Serial.println(jsonData);
 
       // Test if parsing succeeds.
       if (!root.success()) {
@@ -164,8 +170,8 @@ void getLoc() {
 void getAir() {
   HTTPClient theClient;
   Serial.println("Making Location HTTP request");
-  theClient.begin("http://www.airnowapi.org/aq/forecast/latLong/?format=application/json&latitude=" +
-    location.lat + "&longitude=" + location.lon + "&date=2019-04-09&distance=25&API_KEY=" + aiqKey); //return IP as .json object
+  String url = "http://www.airnowapi.org/aq/forecast/latLong/?format=application/json&latitude=" + location.lat + "&longitude=" + location.lon + "&date=2019-04-09&distance=25&API_KEY=" + aiqKey;
+  theClient.begin(url); //return IP as .json object
   int httpCode = theClient.GET();
 
   if (httpCode > 0) {
@@ -173,9 +179,9 @@ void getAir() {
       Serial.println("Received HTTP payload.");
       DynamicJsonBuffer jsonBuffer;
       String jsonData = theClient.getString();
+      jsonData =  "{\"start\": "+ jsonData + "}";
       Serial.println("Parsing...");
       JsonObject& root = jsonBuffer.parse(jsonData);
-      Serial.println(jsonData);
 
       // Test if parsing succeeds.
       if (!root.success()) {
@@ -185,7 +191,8 @@ void getAir() {
       }
 
       // Here we are adding the data from the API response to the instance of the LatLon data type we constructed earlier
-      airQuality.aqi = root[0]["AQI"].as<String>();
+      airQuality.aqi = root["start"][0]["AQI"].as<String>();
+      airQuality.quality = root["start"][0]["Category"]["Name"].as<String>();
       
 
     } else {
